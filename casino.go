@@ -560,7 +560,6 @@ func OnLogout(m JsonString, c net.Conn) {
 
 
 func OnActive(m JsonString, c net.Conn) {
-    //fmt.Println("OnActive")
     uid, cid := m.GetUid(), m.GetCid()
     _, exist := Active[cid]
     if exist {
