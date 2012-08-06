@@ -28,7 +28,7 @@ const (
     MAX_PLAYER = 8 // 玩家
     MAX_USER  = 50 // 酱油
     TIME_AC = 12
-    OP_INVITE = 111
+    OP_INVITE = 300
     URL_INVITE = "http://appstore.yy.com/market/WebServices/AddUserApp?userId="
     XML_REP = `<?xml version="1.0"?><cross-domain-policy><allow-access-from domain="*" to-ports="*"/></cross-domain-policy>`
 )
@@ -134,6 +134,13 @@ func (r *Round) Login(u User, cid uint32) (ret int) {
 func (r *Round) Join(p Player) (int) {
     ret := RET_FL
     _, exist := r.Players[p.Pos]
+
+    for pos, player := range r.Players {
+        if p.Uid == player.Uid {
+            delete(r.Players, pos)
+        }
+    }
+
     if r.Status == GS_OPEN && 
             len(r.Players) < MAX_PLAYER && exist == false {
         ret = RET_OK
@@ -322,7 +329,7 @@ func acceptConn(c net.Conn) {
         cn := bytes.Count(data.Bytes(), []byte{DELIMITER})
         for ; cn > 0; cn-- {
             jn, err := data.ReadString(DELIMITER)
-            fmt.Println("recv", jn)
+            fmt.Println(time.Now().String()[:19], jn)
             if err != nil {
                 fmt.Println("err", err)
                 continue
@@ -345,6 +352,12 @@ func acceptConn(c net.Conn) {
 
 
 func dispatchOp(jn interface{}, c net.Conn) {
+    defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("dispatchOp recover: ", r)
+        }
+    }()
+
     m := JsonString(jn.(map[string]interface{}))
     Op2handle[m["Op"].(string)](m, c)
 }
@@ -505,6 +518,12 @@ func OnRollingDice(m JsonString, c net.Conn) {
         sendMsg(player.Conn, jn)
         fmt.Println("OnRollingDice rep:", rep)
     }
+
+    for _, user := range r.Users {
+        rep := RollRep{RET_OK, user.Uid, "", "rolling_dice"}
+        jn, _ := json.Marshal(rep)
+        sendMsg(user.Conn, jn)
+    }
 }
 
 
@@ -560,6 +579,7 @@ func OnLogout(m JsonString, c net.Conn) {
 
 
 func OnActive(m JsonString, c net.Conn) {
+    //fmt.Println("OnActive")
     uid, cid := m.GetUid(), m.GetCid()
     _, exist := Active[cid]
     if exist {
@@ -572,15 +592,15 @@ func OnActive(m JsonString, c net.Conn) {
 func OnInvite(m JsonString, c net.Conn) {
     fmt.Println("OnInvite")
     uid, iuid := m.GetUid(), m.GetInviteuid()
-    if uid != OP_INVITE {
+    if iuid != OP_INVITE {
         return
     }
-    go func (iuid uint32) {
-        url := fmt.Sprintf("%v%v", URL_INVITE, iuid)
+    go func (uid uint32) {
+        url := fmt.Sprintf("%v%v", URL_INVITE, uid)
         rep, _ := http.Get(url)
         defer rep.Body.Close()
-        fmt.Println("invite url:", url)
-    }(iuid)
+        //fmt.Println("invite url:", url)
+    }(uid)
 }
 
 
