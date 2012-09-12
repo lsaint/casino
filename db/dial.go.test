@@ -1,0 +1,51 @@
+package main
+
+import (
+    "fmt"
+    "net"
+    "encoding/json"
+)
+
+type GetLogoutTimeReq struct {
+    Op      string
+    Uid     uint32
+}
+
+type SetLogoutTimeReq struct {
+    Op      string
+    Uid     uint32
+}
+
+type ModifyBalanceReq struct {
+    Op      string
+    Uid     uint32
+    Num     int32
+}
+
+func main() {
+    conn, _ := net.Dial("tcp", "127.0.0.1:12918")
+
+    jn, _ := json.Marshal(GetLogoutTimeReq{"getlogtime", 111})
+    conn.Write(append(jn, '\n'))
+
+    //jn, _ = json.Marshal(GetLogoutTimeReq{"getlogouttime", 1111})
+    //conn.Write(append(jn, '\n'))
+
+    //jn, _ = json.Marshal(SetLogoutTimeReq{"setlogouttime", 222})
+    //conn.Write(append(jn, '\n'))
+
+    jn, _ := json.Marshal(ModifyBalanceReq{"modifybalance", 10593000, -11})
+    conn.Write(append(jn, '\n'))
+
+    buf := make([]byte, 1280)
+
+    conn.Read(buf)
+    fmt.Println(string(buf))
+
+    conn.Read(buf)
+    fmt.Println(string(buf))
+
+    conn.Read(buf)
+    fmt.Println(string(buf))
+}
+
