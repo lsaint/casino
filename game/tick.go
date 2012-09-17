@@ -48,7 +48,7 @@ func (ticker *Ticker) kickUnactive(cid, uid uint32) {
         delete(r.Users, uid)
         r.KickPlayer(uid)
         delete(ticker.Active[cid], uid)
-        db.Dao.SetLogoutTime(uid)
+        db.SetLogoutTime(uid)
     }
 
     rep := LogoutRep{0, uid, "logout"}

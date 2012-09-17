@@ -1,14 +1,14 @@
 package db
 
 import (
-    "fmt"
-    "net"
-    "bytes"
+    //"fmt"
     "strconv"
-    "encoding/json"
+    "net/rpc"
+    "net/rpc/jsonrpc"
 )
 
-//
+
+/*
 type GetLogoutTimeReq struct {
     Op      string
     Uid     uint32
@@ -169,13 +169,130 @@ func (dao *DbMgr) GetBalance(uids []uint32) (map[uint32]uint32) {
     return ret
 }
 
+*/
 
-//func main() {
-//    go Dao.SetLogoutTime(10593000)
-//    go Dao.GetLogoutTime(10593000)
-//    go Dao.ModifyBalance(10593000, 22)
-//
-//    var line string
-//    fmt.Scanln(&line) 
-//}
+type argUid struct {
+    Uid     uint32
+}
+
+type getLogTimeRep struct {
+    Logouttime string                                                      
+    Logintime  string
+}
+
+type setTimeRep struct {
+    Time        string 
+}
+
+
+type argModifyBalance struct {
+    Uid     uint32
+    Num     int32
+}
+
+type modifyBalanceRep struct {
+    Balance     uint32
+}
+
+type argGetBalance struct {
+    Uid     []uint32
+}
+
+type getBalanceRep struct {
+    Ubl     map[string]uint32
+}
+
+func (rep *getBalanceRep) keyToUint32() (map[uint32]uint32) {
+    ret := make(map[uint32]uint32)
+    for k, v := range rep.Ubl {
+        uid, _ := strconv.Atoi(k)
+        ret[uint32(uid)] = v
+    }
+    return ret
+}
+
+const (
+    PY_RPC_ADDR =  "127.0.0.1:12918"
+)
+
+
+func GetLogTime(uid uint32) (intime, outtime string, err error) {
+    var cli *rpc.Client
+    if cli, err = jsonrpc.Dial("tcp", PY_RPC_ADDR); err != nil {
+        return 
+    }
+    defer cli.Close()
+    
+    args := &argUid{uid}
+    reply :=  new(getLogTimeRep)
+    if err = cli.Call("getLogTime", args, reply); err != nil {
+        return 
+    }
+    intime, outtime = reply.Logintime, reply.Logouttime
+    return
+}
+
+
+func setTime(uid uint32, isSetLogout bool) (t string, err error){
+    var cli *rpc.Client
+    if cli, err = jsonrpc.Dial("tcp", PY_RPC_ADDR); err != nil {
+        return 
+    }
+    defer cli.Close()
+
+    args := &argUid{uid}
+    reply :=  new(setTimeRep)
+    funcName  := "setLoginTime"
+    if isSetLogout {
+        funcName = "setLogoutTime"
+    }
+    if err = cli.Call(funcName, args, reply); err != nil {
+        return 
+    }
+    t = reply.Time
+    return
+}
+
+func SetLogoutTime(uid uint32) (string, error) {
+    return setTime(uid, true)
+}
+
+func SetLoginTime(uid uint32) (string, error) {
+    return setTime(uid, false)
+}
+
+
+func ModifyBalance(uid uint32, num int32) (balance uint32, err error) {
+    var cli *rpc.Client
+    if cli, err = jsonrpc.Dial("tcp", PY_RPC_ADDR); err != nil {
+        return 
+    }
+    defer cli.Close()
+
+    args := &argModifyBalance{uid, num}
+    reply :=  new(modifyBalanceRep)
+    if err = cli.Call("modifyBalance", args, reply); err != nil {
+        return 
+    }
+    balance = reply.Balance
+    return
+}
+
+
+func GetBalance(uids []uint32) (ubl map[uint32]uint32, err error) {
+    var cli *rpc.Client
+    if cli, err = jsonrpc.Dial("tcp", PY_RPC_ADDR); err != nil {
+        return 
+    }
+    defer cli.Close()
+
+    args := &argGetBalance{uids}
+    reply :=  new(getBalanceRep)
+    if err = cli.Call("getBalance", args, reply); err != nil {
+        return 
+    }
+    ubl = reply.keyToUint32()
+    return
+}
+
 

@@ -61,9 +61,9 @@ func OnLogin(m game.JsonString, c net.Conn) {
 
     award, lost := TimeCheck(uid)
     fmt.Println("time check", award, lost)
-    mod_ret := db.Dao.ModifyBalance(uid, int32(award-lost))
-    bal := mod_ret.Balance
-    db.Dao.SetLoginTime(uid)
+    bal, _ := db.ModifyBalance(uid, int32(award-lost))
+    //bal := mod_ret.Balance
+    db.SetLoginTime(uid)
 
     r, ok := m.GetRound(Casino)
     if ok == false { // 创建
@@ -83,7 +83,7 @@ func OnLogin(m game.JsonString, c net.Conn) {
 }
 
 func TimeCheck(uid uint32) (award, lost uint32){
-    intime, outime := db.Dao.GetLogTime(uid)
+    intime, outime, _ := db.GetLogTime(uid)
     fmt.Println("intime", intime, "outtime", outime)
 
     now := time.Now()
@@ -123,7 +123,7 @@ func OnJoin(m game.JsonString, c net.Conn) {
     pos := m.GetPos()
     rep.Pos, rep.Ret = pos, r.Join(game.Player{game.User{c, uid}, pos, ""})
     if rep.Ret == common.RET_OK {
-        bal := db.Dao.GetBalance([]uint32{uid})
+        bal, _ := db.GetBalance([]uint32{uid})
         rep.Coin = bal[uid]
         r.Broadcast(rep)
     } else {
@@ -180,7 +180,7 @@ func GetPlayerBalance(players map[uint32]game.Player) (ret map[uint32]uint32) {
              uids[i] = player.Uid   
              i++
         }
-        ret = db.Dao.GetBalance(uids)
+        ret, _ = db.GetBalance(uids)
     }
     return
 }
@@ -256,7 +256,7 @@ func OnLogout(m game.JsonString, c net.Conn) {
     if ok {
         delete(ticker.Active[cid], uid)
     }
-    db.Dao.SetLogoutTime(uid)
+    db.SetLogoutTime(uid)
 
     rep := game.LogoutRep{0, uid, "logout"}
     r.Broadcast(rep)
@@ -320,9 +320,13 @@ func OnGiveCoin(m game.JsonString, c net.Conn) {
         return
     }
 
-    db.Dao.ModifyBalance(uid, -coin)
-    db.Dao.ModifyBalance(tuid, coin)
-    rep := game.GiveCoinRep{common.RET_OK, uid, tuid, coin, "give_coin"}    
+    ret := common.RET_OK
+    _, err1 := db.ModifyBalance(uid, -coin)
+    _, err2 := db.ModifyBalance(tuid, coin)
+    if err1 != nil || err2 != nil {
+        ret = common.RET_FL 
+    }
+    rep := game.GiveCoinRep{ret, uid, tuid, coin, "give_coin"}    
     r.Broadcast(rep)
 }
 

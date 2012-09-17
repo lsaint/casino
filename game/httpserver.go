@@ -14,7 +14,9 @@ func (hts *HttpServer) Start(c RoundMap) {
     http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
         status := ""
         for _, round := range c {
-            status += fmt.Sprintf("%+v\n", *round)
+            if len(round.Players) > 0 {
+                status += fmt.Sprintf("%+v\n", *round)
+            }
         }
         fmt.Fprint(w, status)
     })

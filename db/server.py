@@ -6,9 +6,6 @@ from gevent.server import StreamServer
 
 from session import *
 
-import sys
-sys.stdout = sys.stderr
-
 DELIMITER = "\n"
 
 
@@ -32,13 +29,17 @@ def accept(socket, address):
 
 
 def dispatch(jn, socket):
-    print jn
-    op  = jn.get("Op")
-    if op:
-        handles[op](jn, jn["Uid"],socket)
+    print "req", jn
+    kwargs = jn["params"][0]
+    method = eval(jn["method"])
+    reply, err = method(kwargs["Uid"], **kwargs)
+    jn = {"result":reply, "error":err, "id":jn["id"]}
+    print "reply", jn
+    socket.send(json.dumps(jn))
 
 
-def setLogoutTime(jn, uid, s):
+
+def setLogoutTime(uid, **kwargs):
     print "setLogoutTime"
     now = datetime.now()
     ret = session.query(Ltime).filter_by(uid=uid).first()
@@ -48,11 +49,11 @@ def setLogoutTime(jn, uid, s):
         t = Ltime(uid, None, now)
         session.add(t)
     session.commit()
-    rep = {"Op":"setlogouttime", "Ret":0, "Uid":uid, "Time":now.ctime()}
-    sendMsg(s, rep)
+    #rep = {"Op":"setlogouttime", "Ret":0, "Uid":uid, "Time":now.ctime()}
+    return {"Time":now.ctime()}, None
 
 
-def setLoginTime(jn, uid, s):
+def setLoginTime(uid, **kwargs):
     print "setLoginTime"
     now = datetime.now()
     ret = session.query(Ltime).filter_by(uid=uid).first()
@@ -62,11 +63,11 @@ def setLoginTime(jn, uid, s):
         t = Ltime(uid, now, None)
         session.add(t)
     session.commit()
-    rep = {"Op":"setlogintime", "Ret":0, "Uid":uid, "Time":now.ctime()}
-    sendMsg(s, rep)
+    #rep = {"Op":"setlogintime", "Ret":0, "Uid":uid, "Time":now.ctime()}
+    return {"Time":now.ctime()}, None
 
 
-def getLogTime(jn, uid, s):
+def getLogTime(uid, **kwargs):
     print "getLogTime"
     ret = session.query(Ltime).filter_by(uid=uid).first()
     if ret:
@@ -75,51 +76,45 @@ def getLogTime(jn, uid, s):
     else:
         intime = None
         outime = None
-    rep = {"Op":"getlogtime", "Ret":0, "Uid":uid, "Logintime":intime, "Logouttime":outime}
-    sendMsg(s, rep)
+    #rep = {"Op":"getlogtime", "Ret":0, "Uid":uid, "Logintime":intime, "Logouttime":outime}
+    return {"Logintime":intime, "Logouttime":outime}, None
 
 
-
-def modifyBalance(jn, uid, s):
+def modifyBalance(uid, **kwargs):
     print "modifyBalance"
-    n = jn["Num"]
+    n = kwargs["Num"]
     ret = session.query(Counter).filter_by(uid=uid).first()
     if ret:
+        if n < 0 and ret.balance < -n:
+            return {"Balance":None}, False
         ret.balance += n
         if ret.balance < 0:
             ret.balance = 0
     else:
+        if n < 0:
+            return {"Balance":None}, False
         ret = Counter(uid, 0)
         if n > 0:
             ret.balance = n
         session.add(ret)
+
     session.commit()
+    #rep = {"Op":"modifybalance", "Ret":0, "Uid":uid, "Balance":ret.balance}
+    return {"Balance":ret.balance}, None
 
-    rep = {"Op":"modifybalance", "Ret":0, "Uid":uid, "Balance":ret.balance}
-    sendMsg(s, rep)
 
-
-def getBalance(jn, uids, s):
+def getBalance(uids, **kwargs):
     print "getBalance"
     ret = session.query(Counter).filter(Counter.uid.in_(uids)).all()
-    rep = {"Op":"getbalance", "Ret":0, "Ubl":None}
+    #rep = {"Op":"getbalance", "Ret":0, "Ubl":None}
     bals = {}
     for r in ret:
         bals[str(r.uid)] = r.balance
-    rep["Ubl"] = bals
-    sendMsg(s, rep)
+    return {"Ubl":bals}, None
 
 
-handles = {
-        "setlogouttime" : setLogoutTime,
-        "setlogintime"  : setLoginTime,
-        "getlogtime"    : getLogTime,
-        "modifybalance" : modifyBalance,
-        "getbalance"    : getBalance,
-}
-
-def sendMsg(socket, dt):
-    socket.send(json.dumps(dt) + "\n")
+def getBillboard(uid, **kwargs):
+    print "getBillboard"
 
 
 if __name__ == '__main__':
