@@ -26,11 +26,6 @@ class Ltime(Base):
         self.login_time = intime
         self.logout_time = outtime
 
-    def logoutNow(self):
-        self.logout_time = datetime.now()
-        session.commit()
-
-
 
 class Counter(Base):
     __tablename__ = "counter"
@@ -41,16 +36,28 @@ class Counter(Base):
         self.uid = uid
         self.balance = bal
 
-    def increase(self, num):
-        self.balance += num
-        session.commit()
 
-    def decrease(self, num):
-        self.balance -= num
-        if self.balance < 0:
-            self.balance = 0
-        session.commit()
+class Uname(Base):
+    __tablename__ = 'uname'
+    uid = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
 
+    def __init__(self, uid, name):
+        self.uid = uid
+        self.name = name
+
+
+class DayCounter(Base):
+    __tablename__ = 'day_counter'
+    id = Column(Integer, primary_key=True)
+    uid = Column(Integer, nullable=False)
+    chip = Column(Integer, nullable=False)
+    date = Column(Date, nullable=False, default=datetime.now().date)
+
+    def __init__(self, uid, chip, date=datetime.now().date()):
+        self.uid = uid
+        self.chip = chip
+        self.date = date
 
 
 #ret = session.query(Ltime).filter_by(uid=111).first()

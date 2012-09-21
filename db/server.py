@@ -1,12 +1,27 @@
 # -*- coding: utf-8 -*-
 
-import json
+import json, time
+from datetime import datetime, timedelta
 
 from gevent.server import StreamServer
 
 from session import *
 
 DELIMITER = "\n"
+WINNER_CACHE_TIME = 10
+WINNER_COUNT = 5
+BILLBOARD_NUM = 10
+
+
+
+g_uid2name = {}
+
+def cacheName():
+    global g_uid2name
+    ret = session.query(Uname)
+    for q in ret:
+        g_uid2name[q.uid] = q.name
+cacheName()
 
 
 
@@ -32,15 +47,16 @@ def dispatch(jn, socket):
     print "req", jn
     kwargs = jn["params"][0]
     method = eval(jn["method"])
-    reply, err = method(kwargs["Uid"], **kwargs)
+    reply, err = method(**kwargs)
     jn = {"result":reply, "error":err, "id":jn["id"]}
     print "reply", jn
     socket.send(json.dumps(jn))
 
 
 
-def setLogoutTime(uid, **kwargs):
+def setLogoutTime(**kwargs):
     print "setLogoutTime"
+    uid = kwargs["Uid"]
     now = datetime.now()
     ret = session.query(Ltime).filter_by(uid=uid).first()
     if ret:
@@ -53,8 +69,9 @@ def setLogoutTime(uid, **kwargs):
     return {"Time":now.ctime()}, None
 
 
-def setLoginTime(uid, **kwargs):
+def setLoginTime(**kwargs):
     print "setLoginTime"
+    uid = kwargs["Uid"]
     now = datetime.now()
     ret = session.query(Ltime).filter_by(uid=uid).first()
     if ret:
@@ -67,8 +84,9 @@ def setLoginTime(uid, **kwargs):
     return {"Time":now.ctime()}, None
 
 
-def getLogTime(uid, **kwargs):
+def getLogTime(**kwargs):
     print "getLogTime"
+    uid = kwargs["Uid"]
     ret = session.query(Ltime).filter_by(uid=uid).first()
     if ret:
         intime = None if not ret.login_time else ret.login_time.ctime()
@@ -80,8 +98,9 @@ def getLogTime(uid, **kwargs):
     return {"Logintime":intime, "Logouttime":outime}, None
 
 
-def modifyBalance(uid, **kwargs):
+def modifyBalance(**kwargs):
     print "modifyBalance"
+    uid = kwargs["Uid"]
     n = kwargs["Num"]
     ret = session.query(Counter).filter_by(uid=uid).first()
     if ret:
@@ -103,8 +122,9 @@ def modifyBalance(uid, **kwargs):
     return {"Balance":ret.balance}, None
 
 
-def getBalance(uids, **kwargs):
+def getBalance(**kwargs):
     print "getBalance"
+    uids = kwargs["Uid"]
     ret = session.query(Counter).filter(Counter.uid.in_(uids)).all()
     #rep = {"Op":"getbalance", "Ret":0, "Ubl":None}
     bals = {}
@@ -113,12 +133,92 @@ def getBalance(uids, **kwargs):
     return {"Ubl":bals}, None
 
 
-def getBillboard(uid, **kwargs):
+def setName(**kwargs):
+    uid = kwargs["Uid"]
+    name = kwargs["Name"]
+    g_uid2name[uid] = name
+    ret = session.query(Uname).get(uid)
+    if ret:
+        if name != ret.name:
+            ret.name = name
+    else:
+        t = Uname(uid, name)
+        session.add(t)
+    session.commit()
+    return {"Name":name}, None
+
+
+
+def getBillboard(**kwargs):
     print "getBillboard"
+    ret = session.query(Counter).order_by("balance desc")[:BILLBOARD_NUM]
+    uids = []
+    bals = []
+    for i in ret:
+        uids.append(i.uid)
+        bals.append(i.balance)
+
+    #un = session.query(Uname).filter(Uname.uid.in_(uids))
+    #dt = {}
+    #for i in un:
+    #    dt[i.uid] = i.name
+
+    ret = []
+    for i in range(len(uids)):
+        name =  g_uid2name.get(uids[i])
+        name = name if name else ""
+        ret.append((name, str(bals[i])))
+
+    print json.dumps(ret)
+    return {"Billboard":ret}, None
+
+
+def setDayCounter(**kwargs):
+    uid, chip = kwargs["Uid"], kwargs["Chip"]
+    ret = session.query(DayCounter).filter_by(uid=uid, date=datetime.now().date()).first()
+    if ret:
+       ret.chip += chip
+    else:
+       ret = DayCounter(uid, chip)
+       session.add(ret)
+    session.commit()
+
+    return {"Chip":ret.chip}, None
+
+
+g_cacheWinner = {"time":0, "y":[], "t":[]}
+def getWinner(**kwargs):
+    print "getWinners"
+    global g_cacheWinner
+    now = time.time()
+    if now - g_cacheWinner["time"] < WINNER_CACHE_TIME:
+        return {"Today":g_cacheWinner["t"], "Yestoday":g_cacheWinner["y"]}, None
+
+    g_cacheWinner["time"] = now
+    ret_t = session.query(DayCounter).filter_by(date=datetime.now().date()).order_by("chip desc")[:WINNER_COUNT]
+    ret_y = session.query(DayCounter).filter_by(date=datetime.now().date() - timedelta(1)).order_by("chip desc")[:WINNER_COUNT]
+
+    t = []
+    for q in ret_t:
+        name = g_uid2name.get(q.uid) or ""
+        t.append((name, str(q.chip)))
+    g_cacheWinner["t"] = t
+
+    y = []
+    for q in ret_y:
+        name = g_uid2name.get(q.uid) or ""
+        t.append((name, str(q.chip)))
+    g_cacheWinner["y"] = y
+
+    #print "g_cacheWinner", g_cacheWinner
+    #print "g_cacheName", g_uid2name 
+    return {"Today":t, "Yestoday":y}, None
+
 
 
 if __name__ == '__main__':
     server = StreamServer(('127.0.0.1', 12918), accept)
     print 'Starting server on port 12918'
     server.serve_forever()
+
 

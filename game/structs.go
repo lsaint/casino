@@ -77,3 +77,19 @@ type GiveCoinRep struct {
     Op          string
 }
 
+type GetBillboardRep struct {
+    Ret         int
+    Uid         uint32
+    Billboard   [][]string
+    Op          string
+}
+
+
+type GetWinnerRep struct {
+    Ret         int
+    Today       [][]string
+    Yestoday    [][]string
+    Op          string
+}
+
+

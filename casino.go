@@ -41,6 +41,8 @@ func init() {
         "invite"        : OnInvite,
         "send_invite"   : OnSendChlInvite,
         "give_coin"     : OnGiveCoin,
+        "get_billboard" : OnGetBillboard,
+        "get_winner"    : OnGetWinner,
     }
     Casino = make(map[uint32]*game.Round)
     rand.Seed(int64(time.Now().Nanosecond() * time.Now().Nanosecond()))
@@ -328,6 +330,34 @@ func OnGiveCoin(m game.JsonString, c net.Conn) {
     }
     rep := game.GiveCoinRep{ret, uid, tuid, coin, "give_coin"}    
     r.Broadcast(rep)
+}
+
+
+func OnGetBillboard(m game.JsonString, c net.Conn) {
+    fmt.Println("OnGetBillboard")
+    uid := m.GetUid()
+
+    rep := game.GetBillboardRep{Ret:common.RET_FL, Uid:uid, Op:"get_billboard"}
+    bb, err := db.GetBillboard(uid)
+    if err == nil {
+        rep.Ret = common.RET_OK
+        rep.Billboard = bb
+    }
+    game.SendMsg(c, rep)
+}
+
+
+func OnGetWinner(m game.JsonString, c net.Conn) {
+    fmt.Println("OnGetWinner")
+
+    rep := game.GetWinnerRep{Ret:common.RET_FL, Op:"get_winner"} 
+    t, y, err := db.GetWinner()
+    if err == nil {
+        rep.Ret = common.RET_OK
+        rep.Today = t
+        rep.Yestoday = y
+    }
+    game.SendMsg(c, rep)
 }
 
 
