@@ -49,3 +49,6 @@ func (m JsonString) GetTargetUid() (uint32) {
     return uint32(m["TargetUid"].(float64)) 
 }
 
+func (m JsonString) GetName() (string) {
+    return m["Name"].(string)
+}

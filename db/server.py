@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json, time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from gevent.server import StreamServer
 
@@ -9,8 +9,10 @@ from session import *
 
 DELIMITER = "\n"
 WINNER_CACHE_TIME = 10
-WINNER_COUNT = 5
+WINNER_COUNT_T = 10
+WINNER_COUNT_Y = 5
 BILLBOARD_NUM = 10
+END_DATE = date(2012, 10, 11)
 
 
 
@@ -175,11 +177,12 @@ def getBillboard(**kwargs):
 
 def setDayCounter(**kwargs):
     uid, chip = kwargs["Uid"], kwargs["Chip"]
-    ret = session.query(DayCounter).filter_by(uid=uid, date=datetime.now().date()).first()
+    now = datetime.now().date()
+    ret = session.query(DayCounter).filter_by(uid=uid, date=now).first()
     if ret:
        ret.chip += chip
     else:
-       ret = DayCounter(uid, chip)
+       ret = DayCounter(uid, chip, now) # now!?
        session.add(ret)
     session.commit()
 
@@ -195,8 +198,8 @@ def getWinner(**kwargs):
         return {"Today":g_cacheWinner["t"], "Yestoday":g_cacheWinner["y"]}, None
 
     g_cacheWinner["time"] = now
-    ret_t = session.query(DayCounter).filter_by(date=datetime.now().date()).order_by("chip desc")[:WINNER_COUNT]
-    ret_y = session.query(DayCounter).filter_by(date=datetime.now().date() - timedelta(1)).order_by("chip desc")[:WINNER_COUNT]
+    ret_t = session.query(DayCounter).filter_by(date=datetime.now().date()).order_by("chip desc")[:WINNER_COUNT_T]
+    ret_y = session.query(DayCounter).filter_by(date=datetime.now().date() - timedelta(1)).order_by("chip desc")[:WINNER_COUNT_Y]
 
     t = []
     for q in ret_t:
@@ -205,13 +208,12 @@ def getWinner(**kwargs):
     g_cacheWinner["t"] = t
 
     y = []
-    for q in ret_y:
-        name = g_uid2name.get(q.uid) or ""
-        t.append((name, str(q.chip)))
-    g_cacheWinner["y"] = y
+    if datetime.now().date() <= END_DATE:
+        for q in ret_y:
+            name = g_uid2name.get(q.uid) or ""
+            y.append((name, str(q.chip)))
+        g_cacheWinner["y"] = y
 
-    #print "g_cacheWinner", g_cacheWinner
-    #print "g_cacheName", g_uid2name 
     return {"Today":t, "Yestoday":y}, None
 
 

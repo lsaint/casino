@@ -60,9 +60,18 @@ type getBillboardRep struct {
 }
 
 
-type GetWinnerRep struct {
+type getWinnerRep struct {
     Today       [][]string
     Yestoday    [][]string
+}
+
+type argSetDayCounter struct {
+    Uid         uint32 
+    Chip        int32
+}
+
+type setDayCounterRep struct {
+    Chip        int32 
 }
 
 
@@ -191,6 +200,22 @@ func GetBillboard(uid uint32) (ret [][]string, err error) {
     return
 }
 
+func SetDayCounter(uid uint32, chip int32) (ret int32, err error) {
+    var cli *rpc.Client
+    if cli, err = jsonrpc.Dial("tcp", PY_RPC_ADDR); err != nil {
+        return
+    }
+    defer cli.Close()
+
+    args := &argSetDayCounter{uid, chip}
+    reply := new(setDayCounterRep)
+    if cli.Call("setDayCounter", args, reply); err != nil {
+        return
+    }
+    ret = reply.Chip
+    return 
+}
+
 func GetWinner() (t [][]string, y [][]string, err error) {
     var cli *rpc.Client
     if cli, err = jsonrpc.Dial("tcp", PY_RPC_ADDR); err != nil {
@@ -199,7 +224,7 @@ func GetWinner() (t [][]string, y [][]string, err error) {
     defer cli.Close()
 
     args := &nullArg{}
-    reply := new(GetWinnerRep)
+    reply := new(getWinnerRep)
     if cli.Call("getWinner", args, reply); err != nil {
         return
     }

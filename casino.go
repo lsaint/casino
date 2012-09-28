@@ -52,7 +52,7 @@ func init() {
 
 func OnLogin(m game.JsonString, c net.Conn) {
     fmt.Println("OnLogin")
-    uid, cid, t := m.GetUid(), m.GetCid(), m.GetTime()
+    uid, cid, t, name := m.GetUid(), m.GetCid(), m.GetTime(), m.GetName()
     diff := time.Now().Unix() - t
 
     if  diff >= common.ENDURE_SEC || diff < 0 {
@@ -66,6 +66,7 @@ func OnLogin(m game.JsonString, c net.Conn) {
     bal, _ := db.ModifyBalance(uid, int32(award-lost))
     //bal := mod_ret.Balance
     db.SetLoginTime(uid)
+    db.SetName(uid, name)
 
     r, ok := m.GetRound(Casino)
     if ok == false { // 创建
@@ -325,6 +326,8 @@ func OnGiveCoin(m game.JsonString, c net.Conn) {
     ret := common.RET_OK
     _, err1 := db.ModifyBalance(uid, -coin)
     _, err2 := db.ModifyBalance(tuid, coin)
+    db.SetDayCounter(uid, -coin)
+    db.SetDayCounter(tuid, coin)
     if err1 != nil || err2 != nil {
         ret = common.RET_FL 
     }
